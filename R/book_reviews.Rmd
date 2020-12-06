@@ -1,0 +1,10 @@
+---
+title: 'Guided Project: Creating An Efficient Data Analysis Workflow'
+author: "Ba Linh Le"
+date: "6 12 2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
