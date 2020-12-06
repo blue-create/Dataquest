@@ -4,7 +4,34 @@ author: "Ba Linh Le"
 date: "6 12 2020"
 output: html_document
 ---
+# Description
+
+This guided project serves the purpose of practicing data analysis. The data is available for download here: https://data.world/dataquest/book-reviews
+
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+library(readr)
+library(dplyr)
+```
+
+```{r message = FALSE}
+## Import data
+dat <- read_csv("book_reviews.csv")
+
+## Size of dataset 
+dim(dat)
+
+## column names 
+colnames(dat)
+
+## Types of columns using a for loop 
+coltype <- c()
+for (t in colnames(dat)) {
+  t <- typeof(dat[[t]])
+  coltype <- c(coltype, t)
+}
+coltype
+
+## Types of columns using a vector 
+lapply(head(dat), class)
 ```
