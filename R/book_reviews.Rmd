@@ -2,19 +2,32 @@
 title: 'Guided Project: Creating An Efficient Data Analysis Workflow'
 author: "Ba Linh Le"
 date: "6 12 2020"
-output: html_document
+output:
+  html_document:
+    theme: journal
 ---
 # Description
 
 This guided project serves the purpose of practicing data analysis. The data is available for download here: https://data.world/dataquest/book-reviews
 
+# Introduction 
+
+The goal is to figure out which books are most profitable for the company. The data includes purchase history of 5 Statistics books in 4 states as well as their review and price tag. 
+
+# Findings 
+
+Before determining how to define "most profitable", the data needed to be cleaned. Observations with missing values in the column review were removed, inconsistencies in labeling states were corrected, and ratings were transformed from character strings to numeric values to allow calculations. Profit was defined as the product of the  number of purchases and the price tag. The mean review of each book was calculated to assess popularity, but there were no substantial differences in their ratings. 
+
+# Conclusion 
+
+The most profitable book in terms of absolute revenue is the book called "Secrets Of R For Advanced Students". What should be noted here, however, that the dataset does not contain any time related information. In addition to the NA values, the analysis did not consider state differences as well. The findings should therefore be taken with a grain of salt by the reader.
 
 ```{r setup, include=FALSE}
 library(readr)
 library(dplyr)
 ```
 
-```{r message = FALSE}
+```{r data exploration, message = FALSE}
 ## Import data
 dat <- read_csv("book_reviews.csv")
 
@@ -24,7 +37,7 @@ dim(dat)
 ## column names 
 colnames(dat)
 
-## Types of columns using a for loop 
+## Loop: Types of columns
 coltype <- c()
 for (t in colnames(dat)) {
   t <- typeof(dat[[t]])
@@ -32,6 +45,74 @@ for (t in colnames(dat)) {
 }
 coltype
 
-## Types of columns using a vector 
+## Loop: Unique values in each column
+for (t in colnames(dat)) {
+  print(unique(dat[t]))
+}
+
+## Vector: Types of columns 
 lapply(head(dat), class)
+
+## Vector: Unique values in each column
+lapply(dat, unique)
+```
+
+```{r data cleaning/processing, warning = FALSE}
+## Loop: check which columns have data missing 
+na <- c()
+for (t in colnames(dat)) {
+  na[t] <- sum(is.na(dat[[t]]))
+}
+na
+
+## Vector: check which columns have data missing
+dat %>% select_if(function(x) any(is.na(x))) %>% 
+  summarise_each(funs(sum(is.na(.))))
+
+## Remove NA's 
+clean_dat <- dat %>% filter(!is.na(dat$review))
+dim(clean_dat)
+
+## Correct inconsistency in state column
+unique(clean_dat$state)
+clean_dat2 <- clean_dat %>% mutate(
+  state = case_when(
+    state == "California" ~ "CA",
+    state == "New York" ~ "NY",
+    state == "Texas" ~ "TX",
+    state == "Florida" ~ "FL",
+    TRUE ~ state
+  )
+)
+unique(clean_dat2$state)
+
+## Converting textbook ratings to numeric scores
+clean_dat3 <- clean_dat2 %>% mutate(
+  review_num = case_when(
+    review == "Poor" ~ 1,
+    review == "Fair" ~ 2,
+    review == "Good" ~ 3,
+    review == "Great" ~ 4,
+    review == "Excellent" ~ 5),
+  is_high_review = case_when(
+    review_num >= 4 ~ TRUE,
+    review_num < 4 ~ FALSE
+  )
+)
+dim(clean_dat3)
+```
+
+```{r data analysis, warning = FALSE}
+bookdata <- clean_dat3 %>% 
+  group_by(price) %>% 
+  count(book) %>% 
+  mutate(profit = price * n)
+
+bookratings <- clean_dat3 %>% 
+  group_by(book) %>% 
+  summarise(review_mean = mean(review_num))
+
+bookdat <- merge(bookdata, bookratings, by = "book") %>% 
+  arrange(desc(profit))
+bookdat
 ```
