@@ -1,0 +1,167 @@
+---
+title: "Dataquest: Guided Project: Creating An Efficient Data Analysis Workflow, Part 2"
+output: html_document
+author: Ba Linh Le 
+---
+# Introduction 
+
+The aim of this project is to figure out if the company's new program helped to improve sales. The data is available here: https://data.world/dataquest/book-sales-data
+
+```{r setup, message = FALSE}
+library(readr)
+library(stringr)
+library(dplyr)
+library(lubridate)
+library(tidyr)
+library(ggplot2)
+```
+
+
+``` {r}
+dat <- read_csv("sales2019.csv")
+```
+# Exploration
+
+```{r}
+dim(dat)
+sapply(dat, class)
+colSums(is.na(dat))
+```
+
+1. The dataset contains 5000 rows and 5 columns. The column names are: date, user_submitted_review, title, total_purchased, customer_type. 
+
+2. All columns except for total_purchased are character vectors. Total_purchased is of the numeric type. 
+
+3. There is missing data in user_submitted_review (885) and total_purchased (718). 
+
+# Data preparation
+
+## Manage NA cases 
+```{r}
+# Remove NA in user_submitted_review 
+dat1 <- dat %>% 
+  filter(!is.na(user_submitted_review))
+
+# Calculate average number of books purchased
+mean_purchase <-summarize(dat1, mean(total_purchased, 
+                                     na.rm = TRUE))
+
+# Fill missing values in total_purchased with average number of books purchased 
+dat2 <- dat1 %>% 
+  mutate(
+    total_p = unlist(ifelse(is.na(total_purchased),
+                      round(mean_purchase,2), 
+                      total_purchased)))
+```
+
+## Classify text data 
+```{r}
+# Examine unique cases in user_submitted_review
+unique(dat2$user_submitted_review)
+
+# Function that takes in a sentence and returns a value indicating direction and degree of feedback 
+
+classify_review <- function(x) {
+  positive_review = case_when( 
+    str_detect(x, "Awesome") ~ TRUE,
+    str_detect(x, "lot") ~ TRUE,
+    str_detect(x, "Never") ~ TRUE,
+    str_detect(x, "Ok") ~ TRUE,
+    TRUE ~ FALSE
+  )
+}
+
+dat3 <- dat2 %>% 
+  mutate(positive = classify_review(user_submitted_review))
+```
+
+# Analysis 
+
+## Was the new book program effective in increasing book sales?
+```{r}
+# Conversion of date column to temporal data 
+dat3$date <- mdy(dat3$date)
+
+# Create grouping column to distinguish between sales before and after July 1 2019 
+dat4 <- dat3 %>% 
+  mutate(
+    program = case_when( 
+      date > "2019/07/01" ~ "After", 
+      date < "2019/07/01" ~ "Before") 
+  )
+
+# Create summary table to compare number of books purchased before July 1, 2019 to after 
+dat4 %>% group_by(program) %>% 
+  summarize(total_books = sum(total_p))
+```
+
+The simple comparison shows that there is no substantial differences in book sales prior to and after the program implementation.
+
+## Was the new book program effective in increasing book sales for subgroups?
+```{r}
+# Create summary table grouped by date and customer_type 
+dat4 %>% group_by(program, customer_type) %>% 
+  summarize(total_books = sum(total_p))
+```
+
+There is a 100 books difference for the book sales of both customer types. Businesses purchased around 100 books more, whereas individuals purchased around 100 books less.
+
+``` {r, warning = FALSE}
+# Create summary table grouped by date and customer_type 
+dat4 %>% group_by(program, title) %>% 
+  summarize(total_books = sum(total_p)) %>% 
+  pivot_wider(., names_from = program,
+              values_from = total_books) %>% 
+  mutate(difference = After - Before) %>% 
+  arrange(desc(abs(difference)))
+```
+
+The book sales increased and decreased for some book titles. The biggest differences were reported by "Fundamentals of R For Beginners" (decrease by ca. 265 books) and the "Secrets of R for Advanced Students" (increase by ca. 182 books).
+
+## Did review scores improve as a result of the program?
+```{r}
+# Create summary table to compare number of positive reviews before and after July 1, 2019 
+dat4 %>% group_by(program) %>% 
+  summarize(n = sum(positive))
+```
+
+Book review scores improved slightly as a result of the program.
+
+## Is there any relationship between month and the amount of books that were sold?
+```{r}
+# Classify months 
+dat5 <- dat4 %>% 
+  mutate(
+    month = case_when(
+      substr(dat4$date, 6, 7) == "01" ~ "January",
+      substr(dat4$date, 6, 7) == "02" ~ "February",
+      substr(dat4$date, 6, 7) == "03" ~ "March",
+      substr(dat4$date, 6, 7) == "04" ~ "April",
+      substr(dat4$date, 6, 7) == "05" ~ "May",
+      substr(dat4$date, 6, 7) == "06" ~ "June",
+      substr(dat4$date, 6, 7) == "07" ~ "July",
+      substr(dat4$date, 6, 7) == "08" ~ "August",
+      substr(dat4$date, 6, 7) == "09" ~ "September",
+      substr(dat4$date, 6, 7) == "10" ~ "October",
+      substr(dat4$date, 6, 7) == "11" ~ "November",
+      substr(dat4$date, 6, 7) == "12" ~ "December",
+      
+    )
+  )
+
+# Create summary table to compare book sales per month
+dat5 %>% group_by(month) %>% 
+  summarize(sum = sum(total_p)) %>% 
+  arrange(desc(sum))
+
+# Scatterplot 
+dat5$month <- factor(dat5$month, levels = month.name)
+ggplot(aes(x = month), data = dat5) +
+  theme_minimal() +
+  geom_bar() + 
+  xlab("Date") + 
+  ylab("Amount of book orders") + 
+  ggtitle("Bar chart")
+```
+
+Book sales appear to have decreased after the introduction of the program in July but increased again in December.
