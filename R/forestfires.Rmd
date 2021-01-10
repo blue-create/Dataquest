@@ -1,0 +1,74 @@
+---
+title: 'Dataquest: Guided Project:Analyzing Forest Fire Data'
+author: "Ba Linh Le"
+date: "1/10/2021"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+number_sections: true 
+---
+# Introduction
+
+# Setup
+```{r setup}
+library(ggplot2)
+library(dplyr)
+library(readxl)
+
+dat <- read.csv("forestfires.csv")
+```
+
+# Exploration
+```{r explore}
+dim(dat)
+sapply(dat, class)
+glimpse(dat)
+```
+
+# Questions 
+
+## Temporal pattern of forest fires
+
+Which months do forest fires happen the most? 
+Which days of the week do forest fires happen the most?
+```{r}
+dat$month <- factor(dat$month, 
+                    levels = c("jan", "feb", "mar", "apr", "may", 
+                               "jun", "jul", "aug", "sep", "oct", 
+                               "nov", "dec"))
+dat$day <- factor(dat$day, levels = c("mon", "tue", "wed", "thurs",
+                  "fri", "sat", "sun"))
+
+dat_month <- dat %>% 
+  group_by(month) %>%
+  summarize(n = n())
+
+dat_day <- dat %>% 
+  group_by(day) %>% 
+  summarize(n = n())
+
+dat_month %>% 
+  ggplot(aes(x = month, y = n)) + 
+  geom_col() +
+  theme_minimal() +
+  labs(title = "Number of forest fires by month",
+       x = "Month", 
+       y = "Amount of forest fires")
+
+dat_day %>% 
+  ggplot(aes(x = day, y = n)) +
+  geom_col() +
+  theme_minimal() +
+  labs(title = "Number of forest fires by day of the week", 
+       x = "Day of the week", 
+       y = "Amount of forest fires")
+  
+```
+
+## Temporal variation of forest fires
+
+```{r}
+
+```
+
