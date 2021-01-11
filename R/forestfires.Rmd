@@ -10,16 +10,38 @@ number_sections: true
 ---
 # Introduction
 
+This project is part of "Data Visualization in R" workshop in Dataquest's "Data Analyst in R" series. The goal is to visualize potential patterns in forest fires by different variables.
+
 # Setup
-```{r setup}
+```{r packages, messages = FALSE}
 library(ggplot2)
 library(dplyr)
 library(readxl)
+library(tidyverse)
+```
 
+
+```{r setup}
 dat <- read.csv("forestfires.csv")
 ```
 
 # Exploration
+
+There are 517 rows and columns. Each row represents a forest fire event in the past, including the following information:
+- X-axis spatial coordinate within the Montesinho park map: 1 to 9
+- Y-axis spatial coordinate within the Montesinho park map: 2 to 9
+- Month of the year: 'jan' to 'dec'
+- Day of the week: 'mon' to 'sun'
+- FFMC: Fine Fuel Moisture Code index from the FWI system: 18.7 to 96.20
+- DMC: Duff Moisture Code index from the FWI system: 1.1 to 291.3
+- DC: Drought Code index from the FWI system: 7.9 to 860.6
+- ISI: Initial Spread Index from the FWI system: 0.0 to 56.10
+- temp: Temperature in Celsius degrees: 2.2 to 33.30
+- RH: Relative humidity in percentage: 15.0 to 100
+- wind: Wind speed in km/h: 0.40 to 9.40
+- rain: Outside rain in mm/m2 : 0.0 to 6.4
+- area: The burned area of the forest (in ha): 0.00 to 1090.84
+
 ```{r explore}
 dim(dat)
 sapply(dat, class)
@@ -32,7 +54,9 @@ glimpse(dat)
 
 Which months do forest fires happen the most? 
 Which days of the week do forest fires happen the most?
-```{r}
+
+Forest fires are most prevalent in the months of March, August and September. The barchart showing the distribution over the week probably is skewed as it aggregates the datapoints and does not consider forest fire seasons.
+```{r, message = FALSE}
 dat$month <- factor(dat$month, 
                     levels = c("jan", "feb", "mar", "apr", "may", 
                                "jun", "jul", "aug", "sep", "oct", 
@@ -63,12 +87,128 @@ dat_day %>%
   labs(title = "Number of forest fires by day of the week", 
        x = "Day of the week", 
        y = "Amount of forest fires")
-  
 ```
 
-## Temporal variation of forest fires
+## Filtered temporal variation 
+
+In this section, I have created two graphs for each season: forest fire and non-forest fire season. We can see that the y axes have different scales: in non-forest fire season, there are at most slightly over 20 forest fires per weekday, in forest fire season, there are well over 40 forest fires on average.
+
+However, in both bar charts, Sunday appears to be the day where most fores fires occur.
+```{r, message = FALSE}
+dat_small <- dat %>% 
+  filter(month == "aug" |
+         month == "sep" |
+         month == "mar") %>% 
+  group_by(day) %>% 
+  summarize(n = n())
+
+dat_big <- dat %>% 
+  filter(month != "aug" &
+         month != "sep" &
+         month != "mar") %>% 
+  group_by(day) %>% 
+  summarize(n = n())
+
+dat_small %>% 
+  ggplot(aes(x = day, y = n)) +
+  geom_col() +
+  theme_minimal() +
+  labs(title = "Number of forest fires by day of the week in forest fire season", 
+       x = "Day of the week", 
+       y = "Amount of forest fires")
+
+dat_big %>% 
+  ggplot(aes(x = day, y = n)) +
+  geom_col() +
+  theme_minimal() +
+  labs(title = "Number of forest fires by day of the week in non-forest fire season", 
+       x = "Day of the week", 
+       y = "Amount of forest fires")
+```
+ 
+## Variation in other forest fires variables over time
+
+How do the other variables that relate to forest fires vary by month and by day of the week?
+
+The graphs are inconclusive.
 
 ```{r}
+dat_var <- dat %>% 
+  pivot_longer(
+    cols = c(FFMC, DMC, DC, ISI, temp, RH, wind, rain),
+    values_to = "value",
+    names_to = "column"
+  )
 
+dat_var %>% ggplot(aes(x = month, y = value)) +
+  geom_col() +
+  facet_wrap(vars(column), scales = "free_y") +
+  theme_minimal() +
+  labs(
+    title = "Temporal variation in months",
+    x = "Month",
+    y = "Variable"
+  )
+
+dat_var %>% ggplot(aes(x = day, y = value)) +
+  geom_col() +
+  facet_wrap(vars(column), scales = "free_y") +
+  theme_minimal() +
+  labs(
+    title = "Temporal variation in weekdays",
+    x = "Month",
+    y = "Variable"
+  )
+```
+
+## Forest fire severity by burned area
+
+How does the area burned in hectare vary by the other variables that relate to forest fires? 
+
+The first graph is inconclusive and a closer look shows that there are outliers skewing the picture.
+
+```{r, message = FALSE}
+dat_var %>% 
+  ggplot(aes(x = value, y = area)) +
+  geom_point() +
+  facet_wrap(vars(column), scales = "free_x") +
+  labs(
+    title = "Relationship between burned area and other variables",
+    y = "Burned area (hectare)",
+    x = "Variable"
+  ) +
+  theme_minimal()
+
+hist(dat$area)
+```
+
+## Managing outliers
+
+I clean the data by filtering out forest fires with burned areas over 300 hectare and less than 0 hectare.
+
+The final graph shows us that the following variable values are favorable for forest fires: 
+- Drought Code indexes over 250 
+- Duff Moisture Code indexes over 100 
+- Fine Fuel Moisture Code indexes over 80
+- Initial Spread Indexes between 5 and 10 
+- rain around 0 mm/m2 
+- Relative humidity between 25 and 50 
+- temperature between 15 and 30 Celsius degrees.
+
+```{r}
+dat_clean <- dat_var %>% 
+  filter(area < 300 & area > 0) 
+dat_clean <- na.omit(dat_clean)
+
+dat_clean %>% 
+  ggplot(aes(x = value, y = area)) +
+  geom_point() +
+  facet_wrap(vars(column), scales = "free_x") +
+  labs(
+    title = "Relationship between burned area and other variables",
+    y = "Burned area (hectare)",
+    x = "Variable"
+  ) +
+  theme_minimal()
 ```
 
