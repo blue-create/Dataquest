@@ -10,6 +10,10 @@ number_sections: true
 ---
 # Introduction 
 
+This project aims to answer the following questions: 
+
+- Do student, teacher, and parent perceptions of NYC school quality appear to be related to demographic and academic success metrics?
+- Do students, teachers, and parents have similar perceptions of NYC school quality?
 
 
 # Setup
@@ -19,7 +23,151 @@ library(dplyr)
 library(tidyverse)
 library(ggplot2)
 library(stringr)
+library(readr)
 
 sessionInfo()
 ```
 
+```{r data import, message = FALSE}
+combined <- read_csv("combined.csv")
+dat <- read_tsv("2011_School_Survey/2011 data files online/masterfile11_gened_final.txt")
+dat_75 <- read_tsv("2011_School_Survey/2011 data files online/masterfile11_d75_final.txt")
+```
+
+# Preparation 
+
+In this step, I will simplify the survey dataframes to include only variables needed for the analysis. 
+
+The two survey datasets contain two different sets of schools and were merged by binding the rows. To only include schools that are present in the `combined` dataset, I merged the survey dataset with the `combined` dataset using the `right_join()` function.
+
+```{r}
+dat1 <- dat %>% 
+  select(dbn:aca_tot_11) %>% 
+  filter(., grepl("High School", schooltype))
+
+dat_75_1 <- dat_75 %>% 
+  select(dbn:aca_tot_11) %>% 
+  filter
+
+dat_total <- bind_rows(dat1, dat_75_1) %>% 
+  rename(DBN = dbn) %>% 
+  right_join(combined, by = "DBN")
+```
+
+# Analysis 
+
+To reiterate, the analysis covers two questions in the following order: 
+
+- Do student, teacher, and parent perceptions of NYC school quality appear to be related to demographic and academic success metrics?
+- Do students, teachers, and parents have similar perceptions of NYC school quality?
+
+## Relationship between perceptions of school quality and demographic & academic success metrics
+
+To answer the first question, I first create a correlation tibble. I created two scatterplot, one including outliers and the other one excluding outliers.
+
+```{r}
+corr <- dat_total %>% 
+  select(saf_p_11:aca_tot_11, avg_sat_score) %>% 
+  cor(use = "pairwise.complete.obs") %>% 
+  as_tibble(rownames = "variable")
+
+hist(corr$avg_sat_score, 
+     main = "Distribution of Avg. SAT score correlations", 
+     xlab = "Avg. SAT score correlation")
+
+ggplot(data = corr, aes(x = avg_sat_score, y = variable)) +
+  geom_point() +
+  theme_minimal() +
+  labs(title = "Relationship between Avg. SAT score and other metrics including outliers",
+       x = "Avg. SAT score correlation", 
+       y = "Variable") +
+  geom_vline(xintercept = 0, linetype = "dotted")
+```
+
+Here, we can see that there seems to be a slight to moderate positive correlation between different metrics and the average SAT score. However, due to the outlier of correlating avg. SAT score with avg. SAT score, there scatterplot seems distorted.
+
+
+```{r}
+corr1 <- corr %>% 
+  filter(avg_sat_score > -0.25 &
+           avg_sat_score < 0.25)
+
+ggplot(data = corr1, aes(x = avg_sat_score, y = variable)) +
+  geom_point() +
+  theme_minimal() +
+  labs(title = "Relationship between Avg. SAT score and other metrics excluding outliers",
+       x = "Avg. SAT score correlation", 
+       y = "Variable") +
+  geom_vline(xintercept = 0, linetype = "dotted")
+```
+Exluding the outliers paints a much more pleasent scatterplot to look at. The majority of the correlations range from slightly less than 0.05 to almost 0.2. The correlations are therefore not very strong. There is one negative correlation: avg. SAT score appears to increase as the Communication score of parents decreases and vice versa. 
+
+
+## Similarity of school quality perceptions 
+
+To test the similarly of the different responses to school quality, I created two additional variables entailing the categories of responder and metric type.
+
+```{r}
+corr_no_tot <- corr %>% 
+  filter(!grepl("tot", variable))
+corr_tot <- corr %>% 
+  filter(grepl("tot", variable))
+
+corr_clean_no_tot <- corr_no_tot %>% 
+  mutate(type = str_sub(variable, 5, 5),
+         variable = str_sub(variable,1,3))
+corr_clean_tot <- corr_tot %>% 
+  mutate(type = str_sub(variable, 5, 7), 
+         variable = str_sub(variable, 1, 3))
+
+corr_clean <- bind_rows(corr_clean_tot, corr_clean_no_tot,corr[which(grepl("avg", corr$variable)), ])
+corr_clean[nrow(corr_clean), ncol(corr_clean)] <- "tot"
+  
+corr_no_outl <- corr_clean %>% 
+  filter(avg_sat_score > -0.25 &
+        avg_sat_score < 0.25)
+```
+
+
+```{r}
+ggplot(data = corr_clean, 
+       aes(y = variable, x = avg_sat_score, color = type)) +
+  geom_boxplot() +
+  theme_minimal() +
+  labs(title = "Correlation between academic performance and other variables incl. outliers",
+       x = "Avg. SAT score correlation",
+       y = "Variable") +
+scale_color_discrete(name = "Responder type",
+                     labels = c("Parents", "Students",
+                                "Teachers", "Total")) +
+  scale_y_discrete(labels = c("Safety and Respect score", 
+                              "Engagement score", 
+                              "Communication score", 
+                              "Avg. SAT score",
+                              "Academic expectations score")) +
+  geom_vline(xintercept = 0, linetype = "dotted")
+```
+
+As before, including outliers in the scatterplot distorts the picture. All responses appear to be very close to each other.
+
+
+```{r}
+# Visualization
+ggplot(data = corr_no_outl, 
+       aes(y = variable, x = avg_sat_score, color = type)) +
+  geom_boxplot() +
+  theme_minimal() +
+  labs(title = "Correlation between academic performance and other variables excl. outliers",
+       x = "Avg. SAT score correlation",
+       y = "Variable") +
+scale_color_discrete(name = "Responder type",
+                     labels = c("Parents", "Students",
+                                "Teachers", "Total")) +
+  scale_y_discrete(labels = c("Safety and Respect score", 
+                              "Engagement score", 
+                              "Communication score", 
+                              "Avg. SAT score",
+                              "Academic expectations score")) +
+  geom_vline(xintercept = 0, linetype = "dotted")
+```
+Excluding outliers makes differences between responder types more visible. In general, parents' views seems to diverge most from the other responders' answers. Teachers' and students' and total responses are fairly close to each other on the other hand, though we should take into account that there are only two responses from students whereas there are three responses from teachers and total and four responses from parents. 
