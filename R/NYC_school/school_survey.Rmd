@@ -1,0 +1,25 @@
+---
+title: 'Dataquest: Guided Project: NYC Schools Perceptions'
+author: "Ba Linh Le"
+date: "1/12/2021"
+output: 
+  html_document:
+    toc: true
+    toc_float: true 
+number_sections: true
+---
+# Introduction 
+
+
+
+# Setup
+
+```{r setup}
+library(dplyr)
+library(tidyverse)
+library(ggplot2)
+library(stringr)
+
+sessionInfo()
+```
+
